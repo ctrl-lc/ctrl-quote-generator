@@ -103,7 +103,7 @@ def check_brands():
 
 
 def check_year_for_russian_trucks():
-    if request.args['vehicle_type'] == 'semitrailer' \
+    if request.args['vehicle_type'] == 'semitruck' \
             and request.args['truck_brand'] in ['KAMAZ', 'MAZ'] \
             and not 2018 <= int(request.args['year']) <= 2021:
         return 'For truck brands "KAMAZ" and "MAZ" ' \

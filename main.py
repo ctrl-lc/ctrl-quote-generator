@@ -2,10 +2,13 @@ from flask import Flask, request, make_response
 from numpy_financial import pmt
 
 
+UPDATE_DATE = '2021-01-10'
+
+
 app = Flask(__name__)
 
 
-@app.route("/")
+@app.route("/quote")
 def get_quote():
 
     error_message, error_code = check_params()
@@ -137,6 +140,10 @@ def calc_payment() -> int:
         }
     }
 
+
+@app.route('/calc_update_date')
+def calc_update_date():
+    return UPDATE_DATE
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App

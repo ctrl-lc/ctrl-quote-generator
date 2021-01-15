@@ -1,4 +1,5 @@
 from collections import namedtuple
+from icontract import require, ViolationError
 from flask import Flask, request, make_response
 from numpy_financial import pmt
 
@@ -11,71 +12,55 @@ app = Flask(__name__)
 @app.route("/quote")
 def get_quote():
 
-    error_message, error_code = check_params(**request.args)
-    if error_message is not None:
-        return make_response(error_message, error_code)
+    try:
+        check_params(request.args)
+    except ViolationError as err:
+        return make_response(str(err), 400)
 
     calc_params = extract_calc_params(**request.args)
     return calc_payment(**calc_params._asdict())
 
 
-def check_params(**args):
+REQUIRED_PARAMS = {'vehicle_type', 'year', 'VAT_included', 'downpayment',
+                   'price', 'brand'}
 
-    CHECKS = [check_missing_params, check_vehicle_type, check_numericals,
+
+@require(lambda args: args and not(REQUIRED_PARAMS - set(args.keys())),
+         'Missing required parameters')
+def check_params(args: dict):
+
+    CHECKS = [check_vehicle_type, check_numericals,
               check_vat, check_brand, check_year_for_russian_trucks]
 
     for check in CHECKS:
-        result = check(**args)
-        if result:
-            return result
-
-    return None, None
+        check(**args)
 
 
-def check_missing_params(**args):
-    REQUIRED_PARAMS = {'vehicle_type', 'year', 'VAT_included', 'downpayment',
-                       'price', 'brand'}
-
-    missing_params = REQUIRED_PARAMS - set(args.keys())
-    if missing_params:
-        return f'Missing parameters: {", ".join(missing_params)}.', 400
-
-
+@require(lambda vehicle_type: vehicle_type.lower()
+         in ['semitrailer', 'semitruck'],
+         "Only semitrucks or semtrailers supported as vehicle_type")
 def check_vehicle_type(vehicle_type, **args):
-    VEHICLE_TYPES = ['semitruck', 'semitrailer']
-
-    if vehicle_type not in VEHICLE_TYPES:
-        return (f'`vehicle_type` should be one of: '
-                f'{", ".join(VEHICLE_TYPES)}', 400)
+    pass
 
 
-def check_numericals(**args):
-    NUMERICALS = {
-        'year': (int, 2016, 2021),
-        'downpayment': (float, 0, 0.49999),
-        'price': (int, 1_000_000, 10_000_000)
-    }
+def check_numericals(year, downpayment, price, **args):
 
-    for key, values in NUMERICALS.items():
-        type_, min_, max_ = values
+    @require(lambda year: 2016 <= year <= 2021)
+    @require(lambda downpayment: 0 <= downpayment < 5)
+    @require(lambda price: 1_000_000 <= price <= 20_000_000)
+    def check_transformed(year: int, downpayment: float, price: int):
+        pass
 
-        try:
-            value = type_(args[key])
-        except ValueError:
-            return f'`{key}` should be a {type_}, ' \
-                f'but now it is "{args[key]}".', 400
-
-        if not min_ <= value <= max_:
-            return f'`{key}` should be between {min_} and {max_}, ' \
-                f'but now it is "{args[key]}".', 400
+    try:
+        check_transformed(year=int(year), downpayment=float(downpayment),
+                          price=int(price))
+    except ValueError:
+        raise ViolationError(
+            'year, downpayment or price has a wrong type')
 
 
 def check_vat(VAT_included, **args):
-    try:
-        convert_to_bool(VAT_included)
-    except ValueError:
-        return (f'`VAT_included` should be a bool, '
-                f'but now it is "{VAT_included}".', 400)
+    convert_to_bool(VAT_included)
 
 
 def convert_to_bool(value: str):
@@ -83,39 +68,43 @@ def convert_to_bool(value: str):
         return True
     if value.lower() in ['no', 'false', '0', '-1']:
         return False
-    raise ValueError(f'"{value}" could not be converted to bool')
+    raise ViolationError(
+        f'VAT_included value ("{value}") could not be converted to bool')
 
 
+BRANDS = {
+    # semitrucks
+    'KAMAZ', 'MAZ', 'MAN', 'DAF', 'MERCEDES', 'VOLVO', 'SCANIA', 'RENAULT',
+    'IVECO',
+    # semitrailers
+    'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'
+}
+
+
+@require(lambda brand: brand in BRANDS)
 def check_brand(brand, **args):
-    BRANDS = {
-        # semitrucks
-        'KAMAZ', 'MAZ', 'MAN', 'DAF', 'MERCEDES', 'VOLVO', 'SCANIA', 'RENAULT',
-        'IVECO',
-        # semitrailers
-        'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'
-    }
-
-    if brand not in BRANDS:
-        return f"`brand` should be one of: {', '.join(BRANDS)}, " \
-                f"but now it is `{brand}`.", 400
+    pass
 
 
+@require(
+    lambda vehicle_type, brand, year:
+    vehicle_type != 'semitruck' or brand not in ['KAMAZ', 'MAZ']
+    or 2018 <= int(year) <= 2021,
+    'For truck brands "KAMAZ" and "MAZ" `year` should be >= 2018 and <= 2021')
 def check_year_for_russian_trucks(vehicle_type, brand, year, **args):
-    if vehicle_type == 'semitruck' \
-            and brand in ['KAMAZ', 'MAZ'] \
-            and not 2018 <= int(year) <= 2021:
-        return 'For truck brands "KAMAZ" and "MAZ" ' \
-            '`year` should be >= 2018 and <= 2020', 400
+    pass
+
+
+CalcParams = namedtuple('CalcParams', ['price', 'downpayment', 'VAT_included'])
 
 
 def extract_calc_params(price, downpayment, VAT_included, **args):
-    CalcParams = namedtuple('CalcParams', ['price', 'downpayment',
-                                           'VAT_included'])
     return CalcParams(int(price), float(downpayment),
                       convert_to_bool(VAT_included))
 
 
-def calc_payment(price, downpayment, VAT_included, **args) -> int:
+def calc_payment(price: int, downpayment: float,
+                 VAT_included: bool, **args) -> int:
     BASE_RATE = 0.13
     VAT_RATE = 0.2
     PERIODS = 48

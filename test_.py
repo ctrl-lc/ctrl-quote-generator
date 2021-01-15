@@ -1,12 +1,13 @@
 from urllib.parse import urlencode
 from hypothesis.control import assume
+from icontract import ViolationError
 
 import pytest
 from hypothesis import given
 import hypothesis.strategies as st
 
 
-from quoter import app, check_numericals, check_params, calc_payment
+from quoter import app, check_numericals, check_params, calc_payment, check_year_for_russian_trucks
 
 
 @pytest.fixture
@@ -33,23 +34,28 @@ def test_normal(client):
 @given(st.dictionaries(st.text(), st.text()))
 def test_check_random_params(params):
 
-    assert check_params(**params) != (None, None)
+    with pytest.raises(ViolationError):
+        check_params(params)
 
 
 @given(price=st.integers(), downpayment=st.floats(), year=st.integers())
 def test_check_numericals(price, downpayment, year):
 
-    check_numericals(price=str(price), downpayment=str(downpayment),
-                     year=str(year))
+    with pytest.raises(ViolationError):
+        check_numericals(price=str(price), downpayment=str(downpayment),
+                         year=str(year))
 
 
-@given(price=st.integers(1, 10_000_000),
+@given(price=st.integers(1_000_000, 10_000_000),
        downpayment=st.floats(0.000001, 0.4999999999),
        VAT_included=st.booleans(), year=st.integers(2016, 2021))
 def test_calc(price, downpayment, VAT_included, year):
 
-    assume(check_numericals(
-        price=price, downpayment=downpayment, year=year) is None)
+    try:
+        check_numericals(
+            price=price, downpayment=downpayment, year=year)
+    except ViolationError:
+        assume(False)
 
     payments = calc_payment(price, downpayment, VAT_included)
 
@@ -57,3 +63,11 @@ def test_calc(price, downpayment, VAT_included, year):
     assert payments['downpayment']['value'] >= 0
     assert payments['monthly_payment']['VAT_included']
     assert payments['downpayment']['VAT_included']
+
+
+def test_russian_trucks():
+    check_year_for_russian_trucks('semitruck', 'KAMAZ', 2020)
+    check_year_for_russian_trucks('semitruck', 'MAN', 2016)
+
+    with pytest.raises(ViolationError):
+        check_year_for_russian_trucks('semitruck', 'MAZ', 2016)

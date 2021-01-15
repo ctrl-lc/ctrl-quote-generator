@@ -1,13 +1,12 @@
 from urllib.parse import urlencode
-from hypothesis.control import assume
+
+import hypothesis.strategies as st
+import pytest
+from hypothesis import given, assume
 from icontract import ViolationError
 
-import pytest
-from hypothesis import given
-import hypothesis.strategies as st
-
-
-from quoter import app, check_numericals, check_params, calc_payment, check_year_for_russian_trucks
+from quoter import (app, calc_payment, check_numericals, check_params,
+                    check_year_for_russian_trucks)
 
 
 @pytest.fixture
@@ -71,3 +70,9 @@ def test_russian_trucks():
 
     with pytest.raises(ViolationError):
         check_year_for_russian_trucks('semitruck', 'MAZ', 2016)
+
+
+def test_numericals_transformation():
+    check_numericals('2020', '0.1', '2000000')
+    with pytest.raises(ViolationError):
+        check_numericals('xxx', '0.1', '2000000')

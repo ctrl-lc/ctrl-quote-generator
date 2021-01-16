@@ -25,7 +25,7 @@ def test_normal(client):
         'downpayment': 0.1,
         'VAT_included': 'yes',
         'price': 5_000_000,
-        'brand': 'MAN'
+        'brand': 'MAZ'
     }
     resp = client.get("/quote?" + urlencode(params))
     assert resp.status_code == 200

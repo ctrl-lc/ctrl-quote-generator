@@ -53,17 +53,23 @@ def check_numericals(year, downpayment, price, **args):
     pass
 
 
-BRANDS = {
-    # semitrucks
-    'KAMAZ', 'MAZ', 'MAN', 'DAF', 'MERCEDES', 'VOLVO', 'SCANIA', 'RENAULT',
-    'IVECO',
-    # semitrailers
-    'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'
-}
+TRUCK_BRANDS = {'KAMAZ', 'MAZ', 'MAN', 'DAF', 'MERCEDES', 'VOLVO', 'SCANIA',
+                'RENAULT', 'IVECO'}
+
+TRAILER_BRANDS = {'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'}
 
 
-@require(lambda brand: brand in BRANDS)
-def check_brand(brand, **args):
+@require(
+    lambda brand, vehicle_type: (brand.upper() in TRAILER_BRANDS
+                                 if vehicle_type == 'semitrailer' else True),
+    "Wrong semitrailer brand")
+
+@require(
+    lambda brand, vehicle_type: (brand.upper() in TRUCK_BRANDS
+                                 if vehicle_type == 'semitruck' else True),
+    "Wrong semitruck brand")
+
+def check_brand(brand, vehicle_type, **args):
     pass
 
 

@@ -2,10 +2,11 @@ from urllib.parse import urlencode
 
 import hypothesis.strategies as st
 import pytest
-from hypothesis import given, assume
+from hypothesis import assume, given
 from icontract import ViolationError
+from pydantic import ValidationError
 
-from quoter import (app, calc_payment, check_numericals, check_params,
+from quoter import (CalcParams, app, calc_payment, check_numericals,
                     check_year_for_russian_trucks)
 
 
@@ -33,20 +34,12 @@ def test_normal(client):
 @given(st.dictionaries(st.text(), st.text()))
 def test_check_random_params(params):
 
-    with pytest.raises(ViolationError):
-        check_params(params)
-
-
-@given(price=st.integers(), downpayment=st.floats(), year=st.integers())
-def test_check_numericals(price, downpayment, year):
-
-    with pytest.raises(ViolationError):
-        check_numericals(price=str(price), downpayment=str(downpayment),
-                         year=str(year))
+    with pytest.raises(ValidationError):
+        CalcParams(**params)
 
 
 @given(price=st.integers(1_000_000, 10_000_000),
-       downpayment=st.floats(0.000001, 0.4999999999),
+       downpayment=st.floats(0, 0.5),
        VAT_included=st.booleans(), year=st.integers(2016, 2021))
 def test_calc(price, downpayment, VAT_included, year):
 
@@ -72,7 +65,21 @@ def test_russian_trucks():
         check_year_for_russian_trucks('semitruck', 'MAZ', 2016)
 
 
-def test_numericals_transformation():
-    check_numericals('2020', '0.1', '2000000')
+@given(st.integers(2016, 2021), st.floats(0, 0.5),
+       st.integers(1_000_000, 20_000_000))
+def test_numericals_success(year, downpayment, price):
+    check_numericals(year, downpayment, price)
+
+
+def test_numericals_fails():
     with pytest.raises(ViolationError):
-        check_numericals('xxx', '0.1', '2000000')
+        check_numericals(2020, 0, 5)
+
+    with pytest.raises(ViolationError):
+        check_numericals(2030, 0, 5_000_000)
+
+    with pytest.raises(ViolationError):
+        check_numericals(2020, 0.5, 5_000_000)
+
+    with pytest.raises(ViolationError):
+        check_numericals(2015, 0, 5_000_000)

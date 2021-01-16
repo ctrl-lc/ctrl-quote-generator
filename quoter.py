@@ -1,8 +1,7 @@
-from collections import namedtuple
-from icontract import require, ViolationError
-from flask import Flask, request, make_response
+from flask import Flask, make_response, request
+from icontract import ViolationError, require
 from numpy_financial import pmt
-
+from pydantic import BaseModel, ValidationError
 
 UPDATE_DATE = '2021-01-15'
 
@@ -13,27 +12,31 @@ app = Flask(__name__)
 def get_quote():
 
     try:
-        check_params(request.args)
-    except ViolationError as err:
+        params = CalcParams(**request.args)
+        check_params(params)
+
+    except (ValidationError, ViolationError) as err:
         return make_response(str(err), 400)
 
-    calc_params = extract_calc_params(**request.args)
-    return calc_payment(**calc_params._asdict())
+    return calc_payment(**params.dict())
 
 
-REQUIRED_PARAMS = {'vehicle_type', 'year', 'VAT_included', 'downpayment',
-                   'price', 'brand'}
+class CalcParams(BaseModel):
+    vehicle_type: str
+    brand: str
+    year: int
+    price: int
+    downpayment: float
+    VAT_included: bool
 
 
-@require(lambda args: args and not(REQUIRED_PARAMS - set(args.keys())),
-         'Missing required parameters')
-def check_params(args: dict):
+def check_params(params: CalcParams):
 
     CHECKS = [check_vehicle_type, check_numericals,
-              check_vat, check_brand, check_year_for_russian_trucks]
+              check_brand, check_year_for_russian_trucks]
 
     for check in CHECKS:
-        check(**args)
+        check(**params.dict())
 
 
 @require(lambda vehicle_type: vehicle_type.lower()
@@ -43,33 +46,11 @@ def check_vehicle_type(vehicle_type, **args):
     pass
 
 
+@require(lambda year: 2016 <= year <= 2021)
+@require(lambda downpayment: 0 <= downpayment < 0.5)
+@require(lambda price: 1_000_000 <= price <= 20_000_000)
 def check_numericals(year, downpayment, price, **args):
-
-    @require(lambda year: 2016 <= year <= 2021)
-    @require(lambda downpayment: 0 <= downpayment < 5)
-    @require(lambda price: 1_000_000 <= price <= 20_000_000)
-    def check_transformed(year: int, downpayment: float, price: int):
-        pass
-
-    try:
-        check_transformed(year=int(year), downpayment=float(downpayment),
-                          price=int(price))
-    except ValueError:
-        raise ViolationError(
-            'year, downpayment or price has a wrong type')
-
-
-def check_vat(VAT_included, **args):
-    convert_to_bool(VAT_included)
-
-
-def convert_to_bool(value: str):
-    if value.lower() in ['yes', 'true', '1']:
-        return True
-    if value.lower() in ['no', 'false', '0', '-1']:
-        return False
-    raise ViolationError(
-        f'VAT_included value ("{value}") could not be converted to bool')
+    pass
 
 
 BRANDS = {
@@ -93,14 +74,6 @@ def check_brand(brand, **args):
     'For truck brands "KAMAZ" and "MAZ" `year` should be >= 2018 and <= 2021')
 def check_year_for_russian_trucks(vehicle_type, brand, year, **args):
     pass
-
-
-CalcParams = namedtuple('CalcParams', ['price', 'downpayment', 'VAT_included'])
-
-
-def extract_calc_params(price, downpayment, VAT_included, **args):
-    return CalcParams(int(price), float(downpayment),
-                      convert_to_bool(VAT_included))
 
 
 def calc_payment(price: int, downpayment: float,

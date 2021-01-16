@@ -4,7 +4,7 @@ from flask import Flask, request, make_response
 from numpy_financial import pmt
 
 
-UPDATE_DATE = '2021-01-15'
+UPDATE_DATE = '2021-01-16'
 
 app = Flask(__name__)
 

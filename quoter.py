@@ -1,7 +1,7 @@
 from flask import Flask, make_response, request
 from icontract import ViolationError, require
 from numpy_financial import pmt
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, validator
 
 UPDATE_DATE = '2021-01-16'
 
@@ -29,6 +29,14 @@ class CalcParams(BaseModel):
     downpayment: float
     VAT_included: bool
 
+    @validator('vehicle_type')
+    def vehicle_type_lower(cls, v):
+        return v.strip().lower()
+
+    @validator('brand')
+    def brand_upper(cls, v):
+        return v.strip().upper()
+
 
 def check_params(params: CalcParams):
 
@@ -39,8 +47,7 @@ def check_params(params: CalcParams):
         check(**params.dict())
 
 
-@require(lambda vehicle_type: vehicle_type.lower()
-         in ['semitrailer', 'semitruck'],
+@require(lambda vehicle_type: vehicle_type in ['semitrailer', 'semitruck'],
          "Only semitrucks or semtrailers supported as vehicle_type")
 def check_vehicle_type(vehicle_type, **args):
     pass
@@ -60,23 +67,22 @@ TRAILER_BRANDS = {'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'}
 
 
 @require(
-    lambda brand, vehicle_type: (brand.upper() in TRAILER_BRANDS
+    lambda brand, vehicle_type: (brand in TRAILER_BRANDS
                                  if vehicle_type == 'semitrailer' else True),
     "Wrong semitrailer brand")
-
 @require(
-    lambda brand, vehicle_type: (brand.upper() in TRUCK_BRANDS
+    lambda brand, vehicle_type: (brand in TRUCK_BRANDS
                                  if vehicle_type == 'semitruck' else True),
     "Wrong semitruck brand")
-
 def check_brand(brand, vehicle_type, **args):
     pass
 
 
 @require(
     lambda vehicle_type, brand, year:
-    vehicle_type != 'semitruck' or brand not in ['KAMAZ', 'MAZ']
-    or 2018 <= int(year) <= 2021,
+    2018 <= int(year) <= 2021
+    if vehicle_type == 'semitruck' and brand in ['KAMAZ', 'MAZ']
+    else True,
     'For truck brands "KAMAZ" and "MAZ" `year` should be >= 2018 and <= 2021')
 def check_year_for_russian_trucks(vehicle_type, brand, year, **args):
     pass

@@ -3,7 +3,7 @@ from icontract import ViolationError, require
 from numpy_financial import pmt
 from pydantic import BaseModel, ValidationError, validator
 
-UPDATE_DATE = '2021-01-16'
+UPDATE_DATE = '2021-01-18'
 
 app = Flask(__name__)
 

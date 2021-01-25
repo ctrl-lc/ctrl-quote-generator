@@ -7,7 +7,7 @@ from icontract import ViolationError
 from pydantic import ValidationError
 
 from quoter import (CalcParams, app, calc_payment, check_numericals,
-                    check_year_for_russian_trucks)
+                    check_year_for_worse_trucks)
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def test_normal(client):
         'vehicle_type': ' Semitrailer',
         'year': 2016,
         'downpayment': 0.1,
-        'VAT_included': '0 ',
+        'VAT_included': '0',
         'price': 5_000_000,
         'brand': 'nefaz '
     }
@@ -54,13 +54,13 @@ def test_check_random_params(params):
         CalcParams(**params)
 
 
-def test_russian_trucks():
-    check_year_for_russian_trucks('semitruck', 'KAMAZ', 2020)
-    check_year_for_russian_trucks('semitruck', 'MAN', 2016)
-    check_year_for_russian_trucks('semitrailer', 'MAZ', 2016)
+def test_worse_trucks():
+    check_year_for_worse_trucks('semitruck', 'KAMAZ', 2020)
+    check_year_for_worse_trucks('semitruck', 'MAN', 2016)
+    check_year_for_worse_trucks('semitrailer', 'MAZ', 2016)
 
     with pytest.raises(ViolationError):
-        check_year_for_russian_trucks('semitruck', 'MAZ', 2016)
+        check_year_for_worse_trucks('semitruck', 'MAZ', 2016)
 
 
 @given(st_year, st_downpayment, st_price)

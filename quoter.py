@@ -3,7 +3,7 @@ from icontract import ViolationError, require
 from numpy_financial import pmt
 from pydantic import BaseModel, ValidationError, validator
 
-UPDATE_DATE = '2021-01-18'
+UPDATE_DATE = '2021-01-25'
 
 app = Flask(__name__)
 
@@ -41,7 +41,7 @@ class CalcParams(BaseModel):
 def check_params(params: CalcParams):
 
     CHECKS = [check_vehicle_type, check_numericals,
-              check_brand, check_year_for_russian_trucks]
+              check_brand, check_year_for_worse_trucks]
 
     for check in CHECKS:
         check(**params.dict())
@@ -81,10 +81,10 @@ def check_brand(brand, vehicle_type, **args):
 @require(
     lambda vehicle_type, brand, year:
     2018 <= int(year) <= 2021
-    if vehicle_type == 'semitruck' and brand in ['KAMAZ', 'MAZ']
+    if vehicle_type == 'semitruck' and brand in ['KAMAZ', 'MAZ', 'IVECO']
     else True,
-    'For truck brands "KAMAZ" and "MAZ" `year` should be >= 2018 and <= 2021')
-def check_year_for_russian_trucks(vehicle_type, brand, year, **args):
+    'For truck brands "KAMAZ", "MAZ" and "IVECO" `year` should be >= 2018 and <= 2021')
+def check_year_for_worse_trucks(vehicle_type, brand, year, **args):
     pass
 
 

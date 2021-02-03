@@ -3,7 +3,7 @@ from icontract import ViolationError, require
 from numpy_financial import pmt
 from pydantic import BaseModel, ValidationError, validator
 
-UPDATE_DATE = '2021-01-25'
+UPDATE_DATE = "2021-01-25"
 
 app = Flask(__name__)
 
@@ -29,26 +29,33 @@ class CalcParams(BaseModel):
     downpayment: float
     VAT_included: bool
 
-    @validator('vehicle_type')
+    @validator("vehicle_type")
     def vehicle_type_lower(cls, v):
         return v.strip().lower()
 
-    @validator('brand')
+    @validator("brand")
     def brand_upper(cls, v):
         return v.strip().upper()
 
 
 def check_params(params: CalcParams):
 
-    CHECKS = [check_vehicle_type, check_numericals,
-              check_brand, check_year_for_worse_trucks]
+    CHECKS = [
+        check_vehicle_type,
+        check_numericals,
+        check_brand,
+        check_year_for_worse_trucks,
+    ]
 
     for check in CHECKS:
         check(**params.dict())
 
 
-@require(lambda vehicle_type: vehicle_type in ['semitrailer', 'semitruck'],
-         "Only semitrucks or semtrailers supported as vehicle_type")
+@require(
+    lambda vehicle_type: vehicle_type in ["semitrailer", "semitruck", "dump_truck"],
+    "Only 'semitruck', 'semtrailer' or 'dump_truck' "
+    "are supported as vehicle_type",
+)
 def check_vehicle_type(vehicle_type, **args):
     pass
 
@@ -60,36 +67,48 @@ def check_numericals(year, downpayment, price, **args):
     pass
 
 
-TRUCK_BRANDS = {'KAMAZ', 'MAZ', 'MAN', 'DAF', 'MERCEDES', 'VOLVO', 'SCANIA',
-                'RENAULT', 'IVECO'}
+TRUCK_BRANDS = {
+    "KAMAZ",
+    "MAZ",
+    "MAN",
+    "DAF",
+    "MERCEDES",
+    "VOLVO",
+    "SCANIA",
+    "RENAULT",
+    "IVECO",
+}
 
-TRAILER_BRANDS = {'MAZ', 'SCHMITZ', 'KOGEL', 'NEFAZ'}
+TRAILER_BRANDS = {"MAZ", "SCHMITZ", "KOGEL", "NEFAZ", "TONAR"}
 
 
 @require(
-    lambda brand, vehicle_type: (brand in TRAILER_BRANDS
-                                 if vehicle_type == 'semitrailer' else True),
-    "Wrong semitrailer brand")
+    lambda brand, vehicle_type: (
+        brand in TRAILER_BRANDS if vehicle_type == "semitrailer" else True
+    ),
+    "Wrong semitrailer brand",
+)
 @require(
-    lambda brand, vehicle_type: (brand in TRUCK_BRANDS
-                                 if vehicle_type == 'semitruck' else True),
-    "Wrong semitruck brand")
+    lambda brand, vehicle_type: (
+        brand in TRUCK_BRANDS if vehicle_type == "semitruck" else True
+    ),
+    "Wrong semitruck brand",
+)
 def check_brand(brand, vehicle_type, **args):
     pass
 
 
 @require(
-    lambda vehicle_type, brand, year:
-    2018 <= int(year) <= 2021
-    if vehicle_type == 'semitruck' and brand in ['KAMAZ', 'MAZ', 'IVECO']
+    lambda vehicle_type, brand, year: 2018 <= int(year) <= 2021
+    if vehicle_type == "semitruck" and brand in ["KAMAZ", "MAZ", "IVECO"]
     else True,
-    'For truck brands "KAMAZ", "MAZ" and "IVECO" `year` should be >= 2018 and <= 2021')
+    'For truck brands "KAMAZ", "MAZ" and "IVECO" `year` should be >= 2018 and <= 2021',
+)
 def check_year_for_worse_trucks(vehicle_type, brand, year, **args):
     pass
 
 
-def calc_payment(price: int, downpayment: float,
-                 VAT_included: bool, **args) -> int:
+def calc_payment(price: int, downpayment: float, VAT_included: bool, **args) -> int:
     BASE_RATE = 0.13
     VAT_RATE = 0.2
     PERIODS = 48
@@ -102,17 +121,17 @@ def calc_payment(price: int, downpayment: float,
     investment_plus_VAT = price_plus_VAT * (1 - downpayment)
 
     return {
-        'downpayment': {
-            'value': int(downpayment * price_plus_VAT),
-            'VAT_included': True
+        "downpayment": {
+            "value": int(downpayment * price_plus_VAT),
+            "VAT_included": True,
         },
-        'monthly_payment': {
-            'value': int(-pmt(rate/12, PERIODS, investment_plus_VAT)),
-            'VAT_included': True
-        }
+        "monthly_payment": {
+            "value": int(-pmt(rate / 12, PERIODS, investment_plus_VAT)),
+            "VAT_included": True,
+        },
     }
 
 
-@app.route('/calc_update_date')
+@app.route("/calc_update_date")
 def calc_update_date():
     return UPDATE_DATE

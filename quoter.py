@@ -3,7 +3,7 @@ from icontract import ViolationError, require
 from numpy_financial import pmt
 from pydantic import BaseModel, ValidationError, validator
 
-UPDATE_DATE = "2021-01-25"
+UPDATE_DATE = "2021-02-03"
 
 app = Flask(__name__)
 
@@ -43,8 +43,8 @@ def check_params(params: CalcParams):
     CHECKS = [
         check_vehicle_type,
         check_numericals,
-        check_brand,
-        check_year_for_worse_trucks,
+        check_year_for_russian_vehicles,
+        no_chinese_brands,
     ]
 
     for check in CHECKS:
@@ -53,8 +53,7 @@ def check_params(params: CalcParams):
 
 @require(
     lambda vehicle_type: vehicle_type in ["semitrailer", "semitruck", "dump_truck"],
-    "Only 'semitruck', 'semtrailer' or 'dump_truck' "
-    "are supported as vehicle_type",
+    "Only 'semitruck', 'semitrailer' or 'dump_truck' are supported as vehicle_type",
 )
 def check_vehicle_type(vehicle_type, **args):
     pass
@@ -67,9 +66,7 @@ def check_numericals(year, downpayment, price, **args):
     pass
 
 
-TRUCK_BRANDS = {
-    "KAMAZ",
-    "MAZ",
+BIG_SEVEN = {
     "MAN",
     "DAF",
     "MERCEDES",
@@ -79,32 +76,26 @@ TRUCK_BRANDS = {
     "IVECO",
 }
 
-TRAILER_BRANDS = {"MAZ", "SCHMITZ", "KOGEL", "NEFAZ", "TONAR"}
+EUROPEAN_BRANDS = BIG_SEVEN | {"SCHMITZ", "KOGEL", "KOLUMAN", "GRUNWALD", "KASSBOHRER"}
 
-
-@require(
-    lambda brand, vehicle_type: (
-        brand in TRAILER_BRANDS if vehicle_type == "semitrailer" else True
-    ),
-    "Wrong semitrailer brand",
-)
-@require(
-    lambda brand, vehicle_type: (
-        brand in TRUCK_BRANDS if vehicle_type == "semitruck" else True
-    ),
-    "Wrong semitruck brand",
-)
-def check_brand(brand, vehicle_type, **args):
-    pass
+RUSSIAN_BRANDS = {"MAZ", "KAMAZ", "NEFAZ", "TONAR"}
 
 
 @require(
     lambda vehicle_type, brand, year: 2018 <= int(year) <= 2021
-    if vehicle_type == "semitruck" and brand in ["KAMAZ", "MAZ", "IVECO"]
+    if brand in RUSSIAN_BRANDS
     else True,
-    'For truck brands "KAMAZ", "MAZ" and "IVECO" `year` should be >= 2018 and <= 2021',
+    "For Russian brands the `year` should be >= 2018 and <= 2021",
 )
-def check_year_for_worse_trucks(vehicle_type, brand, year, **args):
+def check_year_for_russian_vehicles(vehicle_type, brand, year, **args):
+    pass
+
+
+@require(
+    lambda brand: brand in RUSSIAN_BRANDS | EUROPEAN_BRANDS,
+    "Only Russian and European brands are allowed, no Chinese",
+)
+def no_chinese_brands(brand, **args):
     pass
 
 

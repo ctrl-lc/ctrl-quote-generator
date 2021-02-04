@@ -24,9 +24,21 @@ def client():
         yield client
 
 
+def request(client, params, success):
+    result = client.get("/quote?" + urlencode(params)).status_code == 200
+    assert result if success else not result
+
+
 st_price = st.integers(1_000_000, 20_000_000)
 st_downpayment = st.floats(0, 0.5)
 st_year = st.integers(2016, 2021)
+
+
+@given(st.dictionaries(st.text(), st.text()))
+def test_check_random_params(params):
+
+    with pytest.raises(ValidationError):
+        CalcParams(**params)
 
 
 def test_normal(client):
@@ -38,8 +50,7 @@ def test_normal(client):
         "price": 5_000_000,
         "brand": "GRUNWALD",
     }
-    resp = client.get("/quote?" + urlencode(params))
-    assert resp.status_code == 200
+    request(client, params, True)
 
     params = {
         "vehicle_type": " dump_truck",
@@ -49,8 +60,7 @@ def test_normal(client):
         "price": 5_000_000,
         "brand": "man ",
     }
-    resp = client.get("/quote?" + urlencode(params))
-    assert resp.status_code == 200
+    request(client, params, True)
 
 
 def test_allowed_vehicle_types_and_brands(client):
@@ -62,17 +72,14 @@ def test_allowed_vehicle_types_and_brands(client):
         "price": 5_000_000,
     }
 
-    def make_request(vt, brand):
-        url = "/quote?" + urlencode(
-            ChainMap(ok_params, {"vehicle_type": vt, "brand": brand})
-        )
-        return client.get(url).status_code
+    def combine(vt, brand):
+        return ChainMap({"vehicle_type": vt, "brand": brand}, ok_params)
 
     def succeeds(vt, brand):
-        assert make_request(vt, brand) == 200
+        request(client, combine(vt, brand), True)
 
     def fails(vt, brand):
-        assert make_request(vt, brand) == 400
+        request(client, combine(vt, brand), False)
 
     succeeds("semitruck", "KAMAZ")
     fails("semitruck", "CHINESE_CRAP")
@@ -85,11 +92,18 @@ def test_allowed_vehicle_types_and_brands(client):
     fails("truck", "whatever")
 
 
-@given(st.dictionaries(st.text(), st.text()))
-def test_check_random_params(params):
+def test_allowed_subtypes(client):
+    ok_params = {
+        "year": 2018,
+        "downpayment": 0.1,
+        "VAT_included": 1,
+        "price": 5_000_000,
+        "vehicle_type": "semitrailer",
+        "brand": "TONAR",
+    }
 
-    with pytest.raises(ValidationError):
-        CalcParams(**params)
+    request(client, ChainMap({"vehicle_subtype": "рефрижератор"}, ok_params), True)
+    request(client, ChainMap({"vehicle_subtype": "пухтовоз"}, ok_params), False)
 
 
 def test_russian_vehicles():

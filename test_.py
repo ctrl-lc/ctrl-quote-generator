@@ -169,3 +169,11 @@ class TestCalc:
         VAT = calc_payment(price, downpayment, True)["monthly_payment"]["value"]
         no_VAT = calc_payment(price, downpayment, False)["monthly_payment"]["value"]
         assert no_VAT > VAT
+
+
+def test_aux_methods(client):
+    resp = client.get("/calc_update_date")
+    assert len(resp.data) == 10
+
+    resp = client.get("/brands")
+    assert resp.get_json().keys() == {'brands'}

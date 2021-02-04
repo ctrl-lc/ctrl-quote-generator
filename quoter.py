@@ -3,7 +3,7 @@ from icontract import ViolationError, require
 from numpy_financial import pmt
 from pydantic import BaseModel, ValidationError, validator
 
-UPDATE_DATE = "2021-02-03"
+UPDATE_DATE = "2021-02-04"
 
 app = Flask(__name__)
 
@@ -80,6 +80,7 @@ EUROPEAN_BRANDS = BIG_SEVEN | {"SCHMITZ", "KOGEL", "KOLUMAN", "GRUNWALD", "KASSB
 
 RUSSIAN_BRANDS = {"MAZ", "KAMAZ", "NEFAZ", "TONAR"}
 
+ALLOWED_BRANDS = EUROPEAN_BRANDS | RUSSIAN_BRANDS
 
 @require(
     lambda vehicle_type, brand, year: 2018 <= int(year) <= 2021
@@ -92,7 +93,7 @@ def check_year_for_russian_vehicles(vehicle_type, brand, year, **args):
 
 
 @require(
-    lambda brand: brand in RUSSIAN_BRANDS | EUROPEAN_BRANDS,
+    lambda brand: brand in ALLOWED_BRANDS,
     "Only Russian and European brands are allowed, no Chinese",
 )
 def no_chinese_brands(brand, **args):
@@ -126,3 +127,8 @@ def calc_payment(price: int, downpayment: float, VAT_included: bool, **args) -> 
 @app.route("/calc_update_date")
 def calc_update_date():
     return UPDATE_DATE
+
+
+@app.route("/brands")
+def get_brand_list():
+    return {"brands": list(ALLOWED_BRANDS)}
